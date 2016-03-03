@@ -1,9 +1,45 @@
 #!/usr/bin/env python
-# Title    : fsk_receive.py
-# Function : online receiving of packets
-# Author   : Andrew Goodney
-
-# 14k and 16k
+#
+# IMPORTANT: READ BEFORE DOWNLOADING, COPYING OR USING. By
+# downloading, copying or using the script you agree to
+# this license. If you do not agree to this license, do not #download,
+# copy or use the script.
+#
+# Copyright (c) 2011-2014 SysNet Research lab, NUCES-Islamabad
+#
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# - Redistributions of source code must retain the above copyright
+# notice, this list of conditions and the following disclaimer.
+# - Redistributions in binary form must reproduce the above copyright
+# notice, this list of conditions and the following disclaimer in the
+# documentation and/or other materials provided with the
+# distribution.
+# - Neither the name of the copyright holder nor the names of
+# its contributors may be used to endorse or promote products derived
+# from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+# THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+# INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+# STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+# OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# @author Niaz Ahmed <niaz.ahmed@sysnet.edu.pk>
+# @author Andrew Goodney <goodney@usc.edu>
+# @author Ch. Muhammad Usama <chaudhry.usama@sysnet.edu.pk>
+#
 
 from gnuradio import gr, blks2, audio
 from gnuradio.wxgui import stdgui2, scopesink2
@@ -29,7 +65,7 @@ Range=1.0
 CentreFrequency=14
 Specification='without preamp'
 DataRate=100
-#f2=open('/home/sysnet/Desktop/gnuradio-sir/final-codes/tone-data/results/recvd-pattern.txt','a')
+
 #---------------------------------------------------------------------------------
 class Count:
 	total=0
@@ -43,8 +79,7 @@ def message_callback(payload):
     message64 = ""
     Count.total= Count.total+1
     print Count.total
-    #print "Message Callback fired!"
-    #print "Message length: ",len(payload)
+    
     for byte in payload:
         try:
             message64 = message64 + map_8b_6b[ord(byte)]
@@ -52,15 +87,14 @@ def message_callback(payload):
             message64 = message64 + '[%i]' % ord(byte)
             error = True
     
-    #print "Received base64 message= %s" % (message64)
+    
     if error == False:
         print "Decoded to: %s" % base64.standard_b64decode(message64)
 	Count.successful= Count.successful+1
     else:
 	Count.error=Count.error+1
         print "Error was detected.",Count.error
-    #print "Message Callback fired!"
-    #print "Hit Ctrl-D to exit."
+
 
 class _queue_watcher_thread(_threading.Thread):
     def __init__(self, rcvd_pktq, callback):
@@ -75,9 +109,9 @@ class _queue_watcher_thread(_threading.Thread):
     def run(self):
         while self.keep_running:
             msg = self.rcvd_pktq.delete_head()
-	    #ok, payload = packet_utils.unmake_packet(msg.to_string(), int(msg.arg1()))  # pasted from pkt.py
+	   
 	    payload = msg.to_string()
-	    #print payload
+	  
 	    if self.callback:
 	          self.callback(payload)
 		
@@ -93,12 +127,12 @@ class fsk_graph(gr.top_block):
         self.rcvd_pktq = gr.msg_queue()
         audio_rate = 48000
          
-        #src = gr.wavfile_source("./c", False)
+        
         src = audio.source (audio_rate,"plughw:0,0")
 	mult = gr.multiply_const_ff(10)   # multiply
 	raw_wave = gr.wavfile_sink(filename, 1, audio_rate,16)
 	raw_wave1 = gr.wavfile_sink(filename2, 1, audio_rate,16)
-        #raw_wave2 = gr.wavfile_sink("raw1.wav", 1, audio_rate,16)
+        
         fsk_c = gr.hilbert_fc((audio_rate/300)+1)
 	
 
@@ -106,15 +140,13 @@ class fsk_graph(gr.top_block):
 
 
         bp_coeff = gr.firdes.band_pass(1,audio_rate,BandPass,BandStop,100)
-	#bp_coeff = gr.firdes.band_pass(1,audio_rate,,17500,100)
         bpf = gr.fir_filter_fff(1,bp_coeff)
         
         quad_demod = gr.quadrature_demod_cf(1)#originally 1
         
-        #speaker = audio.sink(audio_rate, "plughw:0,0");
-        
+       
         hpf_coeff = gr.firdes.high_pass(10, audio_rate, 10, 5)
-        #dc_block = gr.fir_filter_fff (1, hpf_coeff)
+       
         dc_block = gr.add_const_ff(-2.225)
         mm = gr.clock_recovery_mm_ff(RepeatTime,0.000625,0.5,0.01,0.1)
         
@@ -124,19 +156,13 @@ class fsk_graph(gr.top_block):
         
         file_sink = gr.file_sink(1, "decoded-bits.dat")
         sink = goodney.sink2(self.rcvd_pktq)
-        #sink = gr.framer_sink_1(self.rcvd_pktq)
         self.connect(bpf,raw_wave1)
 	self.connect(src,raw_wave)
         self.connect(src,bpf,fsk_c,quad_demod,dc_block,mm,slicer,sync_corr,sink)
-        #self.connect(src,bpf,mm,fsk_c,quad_demod,dc_block,slicer,file_sink)
-        #self.connect(bpf,raw_wave2)
-	
         self.watcher = _queue_watcher_thread(self.rcvd_pktq, message_callback)
         
 def main():
     
-	
-   # f2=open('/home/sysnet/Desktop/gnuradio-sir/final-codes/tone-data/results/recvd-pattern.txt','a')
     length=float(raw_input("enter length for the experiment in meters: "))
     datarate=int(raw_input("enter datarate for the experiment in bps: "))
     CentreFrequency=int(raw_input("enter the centre frequency used for experiments "))
@@ -152,7 +178,7 @@ def main():
     filename = '{0}-{1}-{2}'.format(Range,CentreFrequency,Specification) 
     filename2= '{0}-bps'.format(filename)
    
-    #TX_DUR=(((((len(message)-1)/4)*4)+16)*8)/DataRate
+   
 
     fg = fsk_graph()
 
@@ -165,8 +191,7 @@ def main():
     except EOFError:
         print "\nExiting."
 	f.close()
-	#f2.close()
-        #fg.wait()
+	
 
 # Main python entry
 if __name__ == '__main__':
@@ -179,5 +204,4 @@ if __name__ == '__main__':
 	
 	f.write(WritenData)
 	f.close()
-	#f2.close()
         pass
